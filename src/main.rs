@@ -1,4 +1,5 @@
 mod config;
+mod llm;
 
 use clap::Parser;
 
@@ -9,7 +10,11 @@ struct Args {
     prompt: String,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
-    println!("Prompt: {}", args.prompt);
+    let prompt = args.prompt;
+    let response = llm::generate_text(&prompt).await?;
+    println!("Response: {}", response);
+    Ok(())
 }
