@@ -1,14 +1,38 @@
+use anyhow::Result;
+use directories::ProjectDirs;
+use figment::{
+    Figment,
+    providers::{Format, Toml},
+};
 use serde::{Deserialize, Serialize};
+use std::{fs, path::PathBuf};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct AppConfig {
     grok_api_key: String,
 }
 
-pub fn get_api_key() -> String {
-    String::new()
+fn get_config_path() -> PathBuf {
+    let project_directory = ProjectDirs::from("com", "fuji", "fuji").unwrap();
+    project_directory.config_dir().join("config.toml")
 }
 
-pub fn save_api_key(api_key: &String) {}
+fn load_config() -> Result<AppConfig> {
+    let path = get_config_path();
+    Figment::new()
+        .merge(Toml::file(path))
+        .extract::<AppConfig>()
+        .map_err(anyhow::Error::from)
+}
 
-pub fn delete_api_key() {}
+pub fn get_api_key() -> Result<String> {
+    let config = load_config()?;
+    Ok(config.grok_api_key)
+}
+
+pub fn save_api_key(api_key: &String) -> Result<()> {
+    let mut config = load_config()?;
+    config.grok_api_key = api_key.clone();
+    let path = get_config_path();
+    fs::write(path, toml::to_string(&config)?).map_err(anyhow::Error::from)
+}
