@@ -62,7 +62,7 @@ struct LLMContent {
 }
 
 pub async fn generate_text(prompt: &str) -> Result<CleanLLMResponse> {
-    let api_key = config::get_api_key()?;
+    let api_key = config::get_grok_api_key()?;
     let client = Client::new();
 
     let mut header_map = HeaderMap::new();
