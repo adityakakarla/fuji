@@ -37,7 +37,7 @@ async fn main() -> Result<(), anyhow::Error> {
         }
         Commands::Run { prompt } => {
             let response = llm::generate_text(&prompt).await?;
-            println!("Response: {}", response);
+            println!("Response: {:?}", response.output);
         }
     }
     Ok(())

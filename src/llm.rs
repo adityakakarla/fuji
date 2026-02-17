@@ -2,9 +2,9 @@ use crate::config;
 use anyhow::Result;
 use reqwest::{
     Client,
-    header::{self, HeaderMap, HeaderValue},
+    header::{HeaderMap, HeaderValue},
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 const GROK_MODEL: &str = "grok-4-1-fast-reasoning";
 
@@ -20,7 +20,48 @@ struct LLMMessage {
     content: String,
 }
 
-pub async fn generate_text(prompt: &str) -> Result<String> {
+#[derive(Debug, Serialize, Deserialize)]
+struct RawLLMResponse {
+    created_at: i32,
+    completed_at: i32,
+    id: String,
+    model: String,
+    output: Vec<LLMOutput>,
+    temperature: f32,
+    usage: LLMUsage,
+    error: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CleanLLMResponse {
+    pub output: String,
+    pub error: Option<String>,
+    pub cost: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct LLMUsage {
+    input_tokens: u32,
+    output_tokens: u32,
+    total_tokens: u32,
+    num_sources_used: u32,
+    num_server_side_tools_used: u32,
+    cost_in_usd_ticks: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct LLMOutput {
+    content: Vec<LLMContent>,
+    id: String,
+    role: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct LLMContent {
+    text: String,
+}
+
+pub async fn generate_text(prompt: &str) -> Result<CleanLLMResponse> {
     let api_key = config::get_api_key()?;
     let client = Client::new();
 
@@ -50,7 +91,17 @@ pub async fn generate_text(prompt: &str) -> Result<String> {
         return Err(anyhow::Error::msg(res.text().await?));
     }
 
-    let response = res.text().await?;
+    let response = res.json::<RawLLMResponse>().await?;
 
-    Ok(response)
+    let output = &response.output[0];
+    let content = &output.content[0];
+    let text = content.text.clone();
+    let error = response.error;
+    let cost = response.usage.cost_in_usd_ticks / 10_000_000_000.0;
+
+    Ok(CleanLLMResponse {
+        output: text,
+        error,
+        cost,
+    })
 }
