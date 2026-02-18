@@ -6,7 +6,7 @@ use reqwest::{
 };
 use serde::{Deserialize, Serialize};
 
-const GROK_MODEL: &str = "grok-4-1-fast-reasoning";
+const GROK_MODEL: &str = "grok-4-1-fast-non-reasoning";
 
 #[derive(Debug, Serialize)]
 struct LLMInput {

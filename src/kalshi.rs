@@ -1,10 +1,11 @@
 use anyhow::Result;
+use base64::{Engine as _, engine::general_purpose};
 use reqwest::header::{HeaderMap, HeaderValue};
 use rsa::{
     RsaPrivateKey,
-    pkcs8::DecodePrivateKey,
-    pss::{Signature, SigningKey},
-    signature::RandomizedSigner,
+    pkcs1::DecodeRsaPrivateKey,
+    pss::SigningKey,
+    signature::{RandomizedSigner, SignatureEncoding},
 };
 use sha2::Sha256;
 
@@ -16,10 +17,29 @@ pub async fn get_kalshi_cricket_events() -> Result<String> {
     Ok(response)
 }
 
+async fn make_request(method: &str, path: &str) -> Result<String> {
+    let res = match method {
+        "GET" => {
+            let client = reqwest::Client::new();
+            client
+                .get(format!("https://api.elections.kalshi.com{}", path))
+                .send()
+                .await?
+        }
+        _ => return Err(anyhow::Error::msg("Unsupported method")),
+    };
+
+    if let Err(err) = res.error_for_status_ref() {
+        return Err(err.into());
+    }
+
+    Ok(res.text().await?)
+}
+
 async fn make_authenticated_request(method: &str, path: &str) -> Result<String> {
     let kalshi_key_id = get_kalshi_key_id()?;
     let kalshi_private_key = get_kalshi_api_key()?;
-    let current_timestamp = Utc::now().timestamp();
+    let current_timestamp = Utc::now().timestamp_millis();
     let signature = sign_authenticated_request(
         &kalshi_private_key,
         &current_timestamp.to_string(),
@@ -28,22 +48,31 @@ async fn make_authenticated_request(method: &str, path: &str) -> Result<String> 
     )?;
 
     let mut headers = HeaderMap::new();
-    headers.insert("KALSHI_ACCESS_KEY", HeaderValue::from_str(&kalshi_key_id)?);
+    headers.insert("KALSHI-ACCESS-KEY", HeaderValue::from_str(&kalshi_key_id)?);
     headers.insert(
-        "KALSHI_ACCESS_SIGNATURE",
-        HeaderValue::from_str(&signature.to_string())?,
+        "KALSHI-ACCESS-SIGNATURE",
+        HeaderValue::from_str(&signature)?,
     );
     headers.insert(
-        "KALSHI_ACCESS_TIMESTAMP",
+        "KALSHI-ACCESS-TIMESTAMP",
         HeaderValue::from_str(&current_timestamp.to_string())?,
     );
 
-    let client = reqwest::Client::new();
-    let res = client
-        .get(format!("https://demo-api.kalshi.co{}", path))
-        .headers(headers)
-        .send()
-        .await?;
+    let res = match method {
+        "GET" => {
+            let client = reqwest::Client::new();
+            client
+                .get(format!("https://api.elections.kalshi.com{}", path))
+                .headers(headers)
+                .send()
+                .await?
+        }
+        _ => return Err(anyhow::Error::msg("Unsupported method")),
+    };
+
+    if let Err(err) = res.error_for_status_ref() {
+        return Err(err.into());
+    }
     Ok(res.text().await?)
 }
 
@@ -52,11 +81,11 @@ fn sign_authenticated_request(
     timestamp: &str,
     method: &str,
     path: &str,
-) -> Result<Signature> {
+) -> Result<String> {
     let path_without_query = path.split('?').next().unwrap();
     let message = format!("{}{}{}", timestamp, method, path_without_query);
-    let rsa_private_key = RsaPrivateKey::from_pkcs8_pem(private_key)?;
+    let rsa_private_key = RsaPrivateKey::from_pkcs1_pem(private_key)?;
     let signing_key = SigningKey::<Sha256>::new(rsa_private_key);
     let signature = signing_key.sign_with_rng(&mut rand::thread_rng(), message.as_bytes());
-    Ok(signature)
+    Ok(general_purpose::STANDARD.encode(signature.to_bytes()))
 }

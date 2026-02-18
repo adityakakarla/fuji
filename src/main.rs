@@ -51,7 +51,8 @@ async fn main() -> Result<(), anyhow::Error> {
         Commands::Run { prompt } => {
             let response = llm::generate_text(&prompt).await?;
             println!("Response: {:?}", response.output);
-            get_kalshi_cricket_events().await?;
+            let kalshi_response = get_kalshi_cricket_events().await?;
+            println!("{:?}", kalshi_response);
         }
     }
     Ok(())
