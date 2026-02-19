@@ -1,4 +1,4 @@
-use crate::config;
+use crate::{config, kalshi::get_balance};
 use anyhow::Result;
 use reqwest::{
     Client,
@@ -12,6 +12,17 @@ const GROK_MODEL: &str = "grok-4-1-fast-non-reasoning";
 struct LLMInput {
     model: String,
     input: Vec<LLMMessage>,
+    tools: Vec<LLMTool>,
+    previous_response_id: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct LLMTool {
+    #[serde(rename = "type")]
+    tool_type: String,
+    name: String,
+    description: String,
+    parameters: serde_json::Value,
 }
 
 #[derive(Debug, Serialize)]
@@ -50,10 +61,20 @@ struct LLMUsage {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct LLMOutput {
-    content: Vec<LLMContent>,
-    id: String,
-    role: String,
+#[serde(tag = "type", rename_all = "snake_case")]
+enum LLMOutput {
+    FunctionCall {
+        name: String,
+    },
+    Message {
+        content: Vec<LLMContent>,
+        status: String,
+    },
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct LLMToolCall {
+    name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -61,7 +82,10 @@ struct LLMContent {
     text: String,
 }
 
-pub async fn generate_text(prompt: &str) -> Result<CleanLLMResponse> {
+pub async fn generate_text(
+    previous_response_id: Option<String>,
+    prompt: &str,
+) -> Result<CleanLLMResponse> {
     let api_key = config::get_grok_api_key()?;
     let client = Client::new();
 
@@ -77,6 +101,13 @@ pub async fn generate_text(prompt: &str) -> Result<CleanLLMResponse> {
             role: "user".to_string(),
             content: prompt.to_string(),
         }],
+        tools: vec![LLMTool {
+            tool_type: "function".to_string(),
+            name: "getBalance".to_string(),
+            description: "Get the current Kalshi balance".to_string(),
+            parameters: serde_json::Value::Object(serde_json::Map::new()),
+        }],
+        previous_response_id: None,
     })?;
 
     let res = client
@@ -94,11 +125,14 @@ pub async fn generate_text(prompt: &str) -> Result<CleanLLMResponse> {
     let response = res.json::<RawLLMResponse>().await?;
 
     let output = &response.output[0];
-    let content = &output.content[0];
-    let text = content.text.clone();
-    let error = response.error;
+    let (text, error) = match output {
+        LLMOutput::FunctionCall { name } => {
+            println!("{:?}", name);
+            (String::new(), Some(String::new()))
+        }
+        LLMOutput::Message { content, .. } => (content[0].text.clone(), response.error),
+    };
     let cost = response.usage.cost_in_usd_ticks / 10_000_000_000.0;
-
     Ok(CleanLLMResponse {
         output: text,
         error,

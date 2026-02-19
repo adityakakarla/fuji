@@ -4,7 +4,7 @@ mod llm;
 
 use clap::{Parser, Subcommand};
 
-use crate::kalshi::get_kalshi_cricket_events;
+use crate::kalshi::get_balance;
 
 #[derive(Parser)]
 #[command(name = "fuji")]
@@ -49,9 +49,9 @@ async fn main() -> Result<(), anyhow::Error> {
             config::view_config()?;
         }
         Commands::Run { prompt } => {
-            let response = llm::generate_text(&prompt).await?;
+            let response = llm::generate_text(None, &prompt).await.unwrap();
             println!("Response: {:?}", response.output);
-            let kalshi_response = get_kalshi_cricket_events().await?;
+            let kalshi_response = get_balance().await?;
             println!("{:?}", kalshi_response);
         }
     }
