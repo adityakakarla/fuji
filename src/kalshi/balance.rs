@@ -9,13 +9,13 @@ struct BalanceOutput {
 }
 
 pub async fn get_balance() -> Result<String> {
-    let response = make_authenticated_request("GET", "/trade-api/v2/portfolio/balance").await?;
+    let response = make_authenticated_request("GET", "/portfolio/balance").await?;
     let json = response.json::<BalanceOutput>().await?;
     Ok(json.balance.to_string())
 }
 
 pub async fn get_portfolio_value() -> Result<String> {
-    let response = make_authenticated_request("GET", "/trade-api/v2/portfolio/balance").await?;
+    let response = make_authenticated_request("GET", "/portfolio/balance").await?;
     let json = response.json::<BalanceOutput>().await?;
     Ok(json.portfolio_value.to_string())
 }

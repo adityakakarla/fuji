@@ -15,12 +15,15 @@ use sha2::Sha256;
 use crate::config::{get_kalshi_api_key, get_kalshi_key_id};
 use chrono::Utc;
 
-async fn make_request(method: &str, path: &str) -> Result<Response> {
+pub async fn make_request(method: &str, path: &str) -> Result<Response> {
     let res = match method {
         "GET" => {
             let client = reqwest::Client::new();
             client
-                .get(format!("https://api.elections.kalshi.com{}", path))
+                .get(format!(
+                    "https://api.elections.kalshi.com/trade-api/v2{}",
+                    path
+                ))
                 .send()
                 .await?
         }
@@ -60,7 +63,10 @@ pub async fn make_authenticated_request(method: &str, path: &str) -> Result<Resp
         "GET" => {
             let client = reqwest::Client::new();
             client
-                .get(format!("https://api.elections.kalshi.com{}", path))
+                .get(format!(
+                    "https://api.elections.kalshi.com/trade-api/v2{}",
+                    path
+                ))
                 .headers(headers)
                 .send()
                 .await?
