@@ -10,29 +10,10 @@ use rsa::{
     pss::SigningKey,
     signature::{RandomizedSigner, SignatureEncoding},
 };
-use serde::Deserialize;
 use sha2::Sha256;
-
-#[derive(Deserialize)]
-struct BalanceOutput {
-    balance: i64,
-    portfolio_value: i64,
-}
 
 use crate::config::{get_kalshi_api_key, get_kalshi_key_id};
 use chrono::Utc;
-
-pub async fn get_balance() -> Result<String> {
-    let response = make_authenticated_request("GET", "/trade-api/v2/portfolio/balance").await?;
-    let json = response.json::<BalanceOutput>().await?;
-    Ok(json.balance.to_string())
-}
-
-pub async fn get_portfolio() -> Result<String> {
-    let response = make_authenticated_request("GET", "/trade-api/v2/portfolio").await?;
-    let json = response.json::<BalanceOutput>().await?;
-    Ok(json.portfolio_value.to_string())
-}
 
 async fn make_request(method: &str, path: &str) -> Result<Response> {
     let res = match method {
@@ -53,7 +34,7 @@ async fn make_request(method: &str, path: &str) -> Result<Response> {
     Ok(res)
 }
 
-async fn make_authenticated_request(method: &str, path: &str) -> Result<Response> {
+pub async fn make_authenticated_request(method: &str, path: &str) -> Result<Response> {
     let kalshi_key_id = get_kalshi_key_id()?;
     let kalshi_private_key = get_kalshi_api_key()?;
     let current_timestamp = Utc::now().timestamp_millis();

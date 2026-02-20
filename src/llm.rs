@@ -1,8 +1,8 @@
-use crate::config;
-use crate::kalshi::kalshi::get_balance;
+use crate::kalshi::balance::get_balance;
+use crate::{config, kalshi::balance::get_portfolio_value};
 use anyhow::Result;
 use reqwest::{
-    Client, Response,
+    Client,
     header::{HeaderMap, HeaderValue},
 };
 use serde::{Deserialize, Serialize};
@@ -45,12 +45,19 @@ struct RawLLMResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CleanLLMResponse {
+pub struct IntermediateLLMResponse {
     pub output: String,
     pub error: Option<String>,
     pub cost: f32,
     pub is_complete: bool,
     pub id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CleanLLMResponse {
+    pub output: String,
+    pub error: Option<String>,
+    pub cost: f32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -87,19 +94,26 @@ struct LLMContent {
 
 pub async fn answer_question(question: &str) -> Result<CleanLLMResponse> {
     let mut response = generate_text(None, question).await?;
+    let mut total_cost = response.cost;
+    let mut total_iterations = 0;
 
-    while !response.is_complete {
-        println!("{:?}", response);
+    while !response.is_complete && total_iterations < 10 {
         response = generate_text(Some(response.id.clone()), &response.output).await?;
+        total_cost += response.cost;
+        total_iterations += 1;
     }
 
-    Ok(response)
+    Ok(CleanLLMResponse {
+        output: response.output,
+        error: response.error,
+        cost: total_cost,
+    })
 }
 
 pub async fn generate_text(
     previous_response_id: Option<String>,
     prompt: &str,
-) -> Result<CleanLLMResponse> {
+) -> Result<IntermediateLLMResponse> {
     let api_key = config::get_grok_api_key()?;
     let client = Client::new();
 
@@ -115,12 +129,22 @@ pub async fn generate_text(
             role: "user".to_string(),
             content: prompt.to_string(),
         }],
-        tools: vec![LLMTool {
-            tool_type: "function".to_string(),
-            name: "getBalance".to_string(),
-            description: "Get the current Kalshi balance".to_string(),
-            parameters: serde_json::Value::Object(serde_json::Map::new()),
-        }],
+        tools: vec![
+            LLMTool {
+                tool_type: "function".to_string(),
+                name: "getBalance".to_string(),
+                description: "Get the current Kalshi cash balance in cents (ex: 100 = $1.00). This is different from portfolio value."
+                    .to_string(),
+                parameters: serde_json::Value::Object(serde_json::Map::new()),
+            },
+            LLMTool {
+                tool_type: "function".to_string(),
+                name: "getPortfolioValue".to_string(),
+                description: "Get the current Kalshi portfolio value in cents (ex: 100 = $1.00). This is different from balance."
+                    .to_string(),
+                parameters: serde_json::Value::Object(serde_json::Map::new()),
+            },
+        ],
         previous_response_id: previous_response_id,
     })?;
 
@@ -142,17 +166,34 @@ pub async fn generate_text(
     let cost = response.usage.cost_in_usd_ticks / 10_000_000_000.0;
 
     match output {
-        LLMOutput::FunctionCall { .. } => {
-            return Ok(CleanLLMResponse {
-                output: get_balance().await?,
-                error: response.error,
-                cost,
-                is_complete: false,
-                id: response.id,
-            });
-        }
+        LLMOutput::FunctionCall { name } => match name.as_str() {
+            "getBalance" => {
+                return Ok(IntermediateLLMResponse {
+                    output: get_balance().await?,
+                    error: response.error,
+                    cost,
+                    is_complete: false,
+                    id: response.id,
+                });
+            }
+            "getPortfolioValue" => {
+                return Ok(IntermediateLLMResponse {
+                    output: get_portfolio_value().await?,
+                    error: response.error,
+                    cost,
+                    is_complete: false,
+                    id: response.id,
+                });
+            }
+            _ => {
+                return Err(anyhow::Error::msg(format!(
+                    "Unknown function call: {}",
+                    name
+                )));
+            }
+        },
         LLMOutput::Message { content, .. } => {
-            return Ok(CleanLLMResponse {
+            return Ok(IntermediateLLMResponse {
                 output: content[0].text.clone(),
                 error: response.error,
                 cost,
