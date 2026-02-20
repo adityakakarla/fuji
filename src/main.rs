@@ -24,7 +24,7 @@ enum Commands {
     ViewConfig,
     Run {
         #[arg(short, long)]
-        prompt: String,
+        prompt: Option<String>,
     },
 }
 
@@ -47,7 +47,13 @@ async fn main() -> Result<(), anyhow::Error> {
             config::view_config()?;
         }
         Commands::Run { prompt } => {
-            let response = llm::answer_question(&prompt).await.unwrap();
+            let response = llm::answer_question(&prompt.unwrap_or(String::from(
+                "Find the best markets for me to bet on. Use your cricketing knowledge.
+    Target markets where the odds are +/- 6% above where the price currently lies. Remember
+    that you can either buy/sell Yes or No for a market.",
+            )))
+            .await
+            .unwrap();
             println!("Response: {:?}", response.output);
         }
     }
