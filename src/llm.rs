@@ -1,4 +1,5 @@
 use crate::kalshi::balance::get_balance;
+use crate::kalshi::markets::get_t20_markets;
 use crate::{config, kalshi::balance::get_portfolio_value};
 use anyhow::Result;
 use reqwest::{
@@ -144,6 +145,13 @@ pub async fn generate_text(
                     .to_string(),
                 parameters: serde_json::Value::Object(serde_json::Map::new()),
             },
+            LLMTool {
+                tool_type: "function".to_string(),
+                name: "getT20Markets".to_string(),
+                description: "Get the current Kalshi T20 markets."
+                    .to_string(),
+                parameters: serde_json::Value::Object(serde_json::Map::new()),
+            },
         ],
         previous_response_id: previous_response_id,
     })?;
@@ -179,6 +187,15 @@ pub async fn generate_text(
             "getPortfolioValue" => {
                 return Ok(IntermediateLLMResponse {
                     output: get_portfolio_value().await?,
+                    error: response.error,
+                    cost,
+                    is_complete: false,
+                    id: response.id,
+                });
+            }
+            "getT20Markets" => {
+                return Ok(IntermediateLLMResponse {
+                    output: get_t20_markets().await?,
                     error: response.error,
                     cost,
                     is_complete: false,

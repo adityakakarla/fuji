@@ -87,7 +87,7 @@ fn sign_authenticated_request(
     path: &str,
 ) -> Result<String> {
     let path_without_query = path.split('?').next().unwrap();
-    let message = format!("{}{}{}", timestamp, method, path_without_query);
+    let message = format!("{}{}/trade-api/v2{}", timestamp, method, path_without_query);
     let rsa_private_key = RsaPrivateKey::from_pkcs1_pem(private_key)?;
     let signing_key = SigningKey::<Sha256>::new(rsa_private_key);
     let signature = signing_key.sign_with_rng(&mut rand::thread_rng(), message.as_bytes());

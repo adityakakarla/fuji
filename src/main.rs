@@ -4,8 +4,6 @@ mod llm;
 
 use clap::{Parser, Subcommand};
 
-use crate::kalshi::markets::get_t20_markets;
-
 #[derive(Parser)]
 #[command(name = "fuji")]
 #[command(about = "The Kalshi trading bot for cricket matches")]
@@ -49,10 +47,8 @@ async fn main() -> Result<(), anyhow::Error> {
             config::view_config()?;
         }
         Commands::Run { prompt } => {
-            let res = get_t20_markets().await?;
-            println!("{:?}", res);
-            // let response = llm::answer_question(&prompt).await.unwrap();
-            // println!("Response: {:?}", response.output);
+            let response = llm::answer_question(&prompt).await.unwrap();
+            println!("Response: {:?}", response.output);
         }
     }
     Ok(())
