@@ -1,4 +1,6 @@
-use crate::kalshi::{kalshi::make_authenticated_request, markets::get_market_basics_by_ticker};
+use crate::kalshi::{
+    kalshi::make_authenticated_request, markets::get_market_information_by_ticker,
+};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
@@ -17,14 +19,25 @@ struct MarketPosition {
     fees_paid_dollars: String,
 }
 
-pub async fn get_positions() -> Result<String> {
+async fn get_positions() -> Result<Positions> {
     let response = make_authenticated_request("GET", "/portfolio/positions").await?;
     let json = response.json::<Positions>().await?;
-    let mut position_details = format!("{:?}", json.market_positions);
+    Ok(json)
+}
 
-    for position in &json.market_positions {
-        let market = get_market_basics_by_ticker(&position.ticker).await?;
-        position_details.push_str(market.as_str());
+pub async fn get_positions_details() -> Result<String> {
+    let positions = get_positions().await?;
+    let mut position_details = String::new();
+
+    for position in positions.market_positions {
+        position_details.push_str(&format!("{:?}", position));
+        position_details.push_str(
+            format!(
+                "{:?}",
+                get_market_information_by_ticker(&position.ticker).await?
+            )
+            .as_str(),
+        );
     }
     Ok(position_details)
 }

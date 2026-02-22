@@ -1,7 +1,7 @@
 use crate::kalshi::balance::get_balance;
-use crate::kalshi::markets::get_t20_markets;
-use crate::kalshi::orders::get_open_orders;
-use crate::kalshi::positions::get_positions;
+use crate::kalshi::markets::get_t20_market_details;
+use crate::kalshi::orders::get_open_order_details;
+use crate::kalshi::positions::get_positions_details;
 use crate::{config, kalshi::balance::get_portfolio_value};
 use anyhow::Result;
 use reqwest::{
@@ -211,7 +211,7 @@ pub async fn generate_text(
             }
             "getT20Markets" => {
                 return Ok(IntermediateLLMResponse {
-                    output: get_t20_markets().await?,
+                    output: get_t20_market_details().await?,
                     error: response.error,
                     cost,
                     is_complete: false,
@@ -220,7 +220,7 @@ pub async fn generate_text(
             }
             "getOrders" => {
                 return Ok(IntermediateLLMResponse {
-                    output: get_open_orders().await?,
+                    output: get_open_order_details().await?,
                     error: response.error,
                     cost,
                     is_complete: false,
@@ -229,7 +229,7 @@ pub async fn generate_text(
             }
             "getPositions" => {
                 return Ok(IntermediateLLMResponse {
-                    output: get_positions().await?,
+                    output: get_positions_details().await?,
                     error: response.error,
                     cost,
                     is_complete: false,

@@ -9,7 +9,7 @@ struct Markets {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Market {
+pub struct Market {
     market: IndividualMarket,
 }
 
@@ -29,22 +29,25 @@ struct IndividualMarket {
     volume: u64,
 }
 
-async fn get_markets_by_series_ticker(series_ticker: &str) -> Result<String> {
+async fn get_markets_by_series_ticker(series_ticker: &str) -> Result<Markets> {
     let request = make_request(
         "GET",
         &format!("/markets?series_ticker={}&status=open", series_ticker),
     )
     .await?;
     let response = request.json::<Markets>().await?;
-    Ok(format!("{:?}", response))
+    Ok(response)
 }
 
-pub async fn get_t20_markets() -> Result<String> {
-    get_markets_by_series_ticker("KXT20MATCH").await
+pub async fn get_t20_market_details() -> Result<String> {
+    Ok(format!(
+        "{:?}",
+        get_markets_by_series_ticker("KXT20MATCH").await?
+    ))
 }
 
-pub async fn get_market_basics_by_ticker(ticker: &str) -> Result<String> {
+pub async fn get_market_information_by_ticker(ticker: &str) -> Result<Market> {
     let request = make_request("GET", &format!("/markets/{}", ticker)).await?;
     let response = request.json::<Market>().await?;
-    Ok(format!("{:?}", response))
+    Ok(response)
 }

@@ -1,4 +1,6 @@
-use crate::kalshi::{kalshi::make_authenticated_request, markets::get_market_basics_by_ticker};
+use crate::kalshi::{
+    kalshi::make_authenticated_request, markets::get_market_information_by_ticker,
+};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
@@ -24,13 +26,25 @@ struct Order {
     maker_fill_cost_dollars: String,
 }
 
-pub async fn get_open_orders() -> Result<String> {
+async fn get_open_orders() -> Result<Orders> {
     let response = make_authenticated_request("GET", "/portfolio/orders").await?;
     let json = response.json::<Orders>().await?;
-    let mut order_details = format!("{:?}", json.orders);
+    Ok(json)
+}
 
-    for order in json.orders {
-        order_details.push_str(get_market_basics_by_ticker(&order.ticker).await?.as_str())
+pub async fn get_open_order_details() -> Result<String> {
+    let orders = get_open_orders().await?;
+    let mut order_details = String::new();
+
+    for order in orders.orders {
+        order_details.push_str(&format!("{:?}", order));
+        order_details.push_str(
+            format!(
+                "{:?}",
+                get_market_information_by_ticker(&order.ticker).await?
+            )
+            .as_str(),
+        );
     }
     Ok(order_details)
 }

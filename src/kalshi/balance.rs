@@ -8,14 +8,18 @@ struct BalanceOutput {
     portfolio_value: i64,
 }
 
-pub async fn get_balance() -> Result<String> {
+async fn get_raw_balance() -> Result<BalanceOutput> {
     let response = make_authenticated_request("GET", "/portfolio/balance").await?;
     let json = response.json::<BalanceOutput>().await?;
-    Ok(json.balance.to_string())
+    Ok(json)
+}
+
+pub async fn get_balance() -> Result<String> {
+    let response = get_raw_balance().await?;
+    Ok(response.balance.to_string())
 }
 
 pub async fn get_portfolio_value() -> Result<String> {
-    let response = make_authenticated_request("GET", "/portfolio/balance").await?;
-    let json = response.json::<BalanceOutput>().await?;
-    Ok(json.portfolio_value.to_string())
+    let response = get_raw_balance().await?;
+    Ok(response.portfolio_value.to_string())
 }
