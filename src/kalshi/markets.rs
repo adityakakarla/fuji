@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::kalshi::kalshi::make_get_request;
+use crate::kalshi::api::make_get_request;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Markets {

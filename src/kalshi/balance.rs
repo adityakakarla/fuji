@@ -1,4 +1,4 @@
-use crate::kalshi::kalshi::make_authenticated_get_request;
+use crate::kalshi::api::make_authenticated_get_request;
 use anyhow::Result;
 use serde::Deserialize;
 

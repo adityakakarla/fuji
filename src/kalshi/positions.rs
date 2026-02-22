@@ -1,5 +1,5 @@
 use crate::kalshi::{
-    kalshi::make_authenticated_get_request, markets::get_market_information_by_ticker,
+    api::make_authenticated_get_request, markets::get_market_information_by_ticker,
 };
 use anyhow::Result;
 use serde::{Deserialize, Serialize};

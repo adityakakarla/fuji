@@ -2,6 +2,7 @@ use crate::kalshi::balance::get_balance;
 use crate::kalshi::markets::get_t20_market_details;
 use crate::kalshi::orders::get_open_order_details;
 use crate::kalshi::positions::get_positions_details;
+use crate::kalshi::purchase::place_order;
 use crate::{config, kalshi::balance::get_portfolio_value};
 use anyhow::Result;
 use reqwest::{
@@ -78,6 +79,7 @@ struct LLMUsage {
 enum LLMOutput {
     FunctionCall {
         name: String,
+        arguments: Option<String>,
     },
     Message {
         content: Vec<LLMContent>,
@@ -168,6 +170,48 @@ pub async fn query_llm(
                     .to_string(),
                 parameters: serde_json::Value::Object(serde_json::Map::new()),
             },
+            LLMTool {
+                tool_type: "function".to_string(),
+                name: "createOrder".to_string(),
+                description: "Place an order on Kalshi. Use yes_price for buying/selling Yes contracts, or no_price for buying/selling No contracts. Prices are in cents (1-99). Only provide the price field relevant to your side.".to_string(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "ticker": {
+                            "type": "string",
+                            "description": "The market ticker to place the order on"
+                        },
+                        "side": {
+                            "type": "string",
+                            "enum": ["yes", "no"],
+                            "description": "Which side to trade: yes or no"
+                        },
+                        "action": {
+                            "type": "string",
+                            "enum": ["buy", "sell"],
+                            "description": "Whether to buy or sell"
+                        },
+                        "count": {
+                            "type": "integer",
+                            "description": "Number of contracts to trade (minimum 1)",
+                            "minimum": 1
+                        },
+                        "yes_price": {
+                            "type": "integer",
+                            "description": "Limit price in cents for the Yes side (1-99). Provide when side is yes.",
+                            "minimum": 1,
+                            "maximum": 99
+                        },
+                        "no_price": {
+                            "type": "integer",
+                            "description": "Limit price in cents for the No side (1-99). Provide when side is no.",
+                            "minimum": 1,
+                            "maximum": 99
+                        }
+                    },
+                    "required": ["ticker", "side", "action", "count"]
+                }),
+            },
         ],
         previous_response_id: previous_response_id,
     })?;
@@ -190,7 +234,7 @@ pub async fn query_llm(
     let cost = response.usage.cost_in_usd_ticks / 10_000_000_000.0;
 
     match output {
-        LLMOutput::FunctionCall { name } => match name.as_str() {
+        LLMOutput::FunctionCall { name, arguments } => match name.as_str() {
             "getBalance" => {
                 return Ok(IntermediateLLMResponse {
                     output: get_balance().await?,
@@ -230,6 +274,35 @@ pub async fn query_llm(
             "getPositions" => {
                 return Ok(IntermediateLLMResponse {
                     output: get_positions_details().await?,
+                    error: response.error,
+                    cost,
+                    is_complete: false,
+                    id: response.id,
+                });
+            }
+            "createOrder" => {
+                let args_str = arguments.as_deref().unwrap_or("{}");
+                let args: serde_json::Value = serde_json::from_str(args_str)
+                    .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+
+                let ticker = args["ticker"].as_str().ok_or_else(|| {
+                    anyhow::anyhow!("createOrder: missing required field 'ticker'")
+                })?;
+                let side = args["side"]
+                    .as_str()
+                    .ok_or_else(|| anyhow::anyhow!("createOrder: missing required field 'side'"))?;
+                let action = args["action"].as_str().ok_or_else(|| {
+                    anyhow::anyhow!("createOrder: missing required field 'action'")
+                })?;
+                let count = args["count"]
+                    .as_i64()
+                    .ok_or_else(|| anyhow::anyhow!("createOrder: missing required field 'count'"))?
+                    as i32;
+                let yes_price = args["yes_price"].as_i64().map(|p| p as i32);
+                let no_price = args["no_price"].as_i64().map(|p| p as i32);
+
+                return Ok(IntermediateLLMResponse {
+                    output: place_order(ticker, side, action, count, yes_price, no_price).await?,
                     error: response.error,
                     cost,
                     is_complete: false,

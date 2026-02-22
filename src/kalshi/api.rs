@@ -10,6 +10,7 @@ use rsa::{
     pss::SigningKey,
     signature::{RandomizedSigner, SignatureEncoding},
 };
+use serde_json::Value;
 use sha2::Sha256;
 
 use crate::config::{get_kalshi_api_key, get_kalshi_key_id};
@@ -61,6 +62,45 @@ pub async fn make_authenticated_get_request(path: &str) -> Result<Response> {
             path
         ))
         .headers(headers)
+        .send()
+        .await?;
+
+    if let Err(err) = res.error_for_status_ref() {
+        return Err(err.into());
+    }
+    Ok(res)
+}
+
+pub async fn make_authenticated_post_request(path: &str, body: &Value) -> Result<Response> {
+    let kalshi_key_id = get_kalshi_key_id()?;
+    let kalshi_private_key = get_kalshi_api_key()?;
+    let current_timestamp = Utc::now().timestamp_millis();
+    let signature = sign_authenticated_request(
+        &kalshi_private_key,
+        &current_timestamp.to_string(),
+        "POST",
+        path,
+    )?;
+
+    let mut headers = HeaderMap::new();
+    headers.insert("KALSHI-ACCESS-KEY", HeaderValue::from_str(&kalshi_key_id)?);
+    headers.insert(
+        "KALSHI-ACCESS-SIGNATURE",
+        HeaderValue::from_str(&signature)?,
+    );
+    headers.insert(
+        "KALSHI-ACCESS-TIMESTAMP",
+        HeaderValue::from_str(&current_timestamp.to_string())?,
+    );
+
+    let client = reqwest::Client::new();
+    let res = client
+        .post(format!(
+            "https://api.elections.kalshi.com/trade-api/v2{}",
+            path
+        ))
+        .headers(headers)
+        .json(body)
         .send()
         .await?;
 
