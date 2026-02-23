@@ -12,12 +12,13 @@ use reqwest::{
 use serde::{Deserialize, Serialize};
 
 const GROK_MODEL: &str = "grok-4-1-fast-non-reasoning";
+const GROK_URL: &str = "https://api.x.ai/v1/responses";
 
 #[derive(Debug, Serialize)]
 struct LLMInput {
     model: String,
     input: Vec<LLMMessage>,
-    tools: Vec<LLMTool>,
+    tools: Option<Vec<LLMTool>>,
     previous_response_id: Option<String>,
 }
 
@@ -115,6 +116,58 @@ pub async fn query_agent(question: &str) -> Result<CleanLLMResponse> {
     })
 }
 
+pub async fn query_llm_without_tools(
+    previous_response_id: Option<String>,
+    prompt: &str,
+) -> Result<CleanLLMResponse> {
+    let api_key = config::get_grok_api_key()?;
+    let client = Client::new();
+
+    let mut header_map = HeaderMap::new();
+    let content_type = HeaderValue::from_str("application/json")?;
+    header_map.insert("Content-Type", content_type);
+    let authorization = HeaderValue::from_str(format!("Bearer {}", api_key).as_str())?;
+    header_map.insert("Authorization", authorization);
+
+    let body = serde_json::to_string(&LLMInput {
+        model: GROK_MODEL.to_string(),
+        input: vec![LLMMessage {
+            role: "user".to_string(),
+            content: prompt.to_string(),
+        }],
+        tools: None,
+        previous_response_id,
+    })?;
+
+    let response = client
+        .post(GROK_URL)
+        .headers(header_map)
+        .body(body)
+        .send()
+        .await?;
+
+    let response = response.json::<RawLLMResponse>().await?;
+
+    let output = &response.output[0];
+    let cost = response.usage.cost_in_usd_ticks / 10_000_000_000.0;
+
+    let text = match output {
+        LLMOutput::Message { content, .. } => content[0].text.clone(),
+        LLMOutput::FunctionCall { name, .. } => {
+            return Err(anyhow::anyhow!(
+                "Unexpected function call '{}' in agent without tools",
+                name
+            ));
+        }
+    };
+
+    Ok(CleanLLMResponse {
+        output: text,
+        error: response.error,
+        cost,
+    })
+}
+
 pub async fn query_llm(
     previous_response_id: Option<String>,
     prompt: &str,
@@ -134,7 +187,7 @@ pub async fn query_llm(
             role: "user".to_string(),
             content: prompt.to_string(),
         }],
-        tools: vec![
+        tools: Some(vec![
             LLMTool {
                 tool_type: "function".to_string(),
                 name: "getBalance".to_string(),
@@ -212,12 +265,12 @@ pub async fn query_llm(
                     "required": ["ticker", "side", "action", "count"]
                 }),
             },
-        ],
+        ]),
         previous_response_id: previous_response_id,
     })?;
 
     let res = client
-        .post("https://api.x.ai/v1/responses")
+        .post(GROK_URL)
         .body(body)
         .headers(header_map)
         .send()
