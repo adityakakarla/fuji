@@ -3,6 +3,7 @@ use crate::kalshi::markets::get_t20_market_details;
 use crate::kalshi::orders::get_open_order_details;
 use crate::kalshi::positions::get_positions_details;
 use crate::kalshi::purchase::place_order;
+use crate::llm::price_agent::price_markets_from_tickers;
 use crate::{config, kalshi::balance::get_portfolio_value};
 use anyhow::Result;
 use reqwest::{
@@ -225,6 +226,24 @@ pub async fn query_llm(
             },
             LLMTool {
                 tool_type: "function".to_string(),
+                name: "priceMarketsFromTickers".to_string(),
+                description: "Get LLM-generated fair price estimates for a list of Kalshi market tickers. Returns a yes bid price (as a decimal probability) for each ticker.".to_string(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "tickers": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "A list of Kalshi market ticker symbols to price"
+                        }
+                    },
+                    "required": ["tickers"]
+                }),
+            },
+            LLMTool {
+                tool_type: "function".to_string(),
                 name: "createOrder".to_string(),
                 description: "Place an order on Kalshi. Use yes_price for buying/selling Yes contracts, or no_price for buying/selling No contracts. Prices are in cents (1-99). Only provide the price field relevant to your side.".to_string(),
                 parameters: serde_json::json!({
@@ -327,6 +346,28 @@ pub async fn query_llm(
             "getPositions" => {
                 return Ok(IntermediateLLMResponse {
                     output: get_positions_details().await?,
+                    error: response.error,
+                    cost,
+                    is_complete: false,
+                    id: response.id,
+                });
+            }
+            "priceMarketsFromTickers" => {
+                let args_str = arguments.as_deref().unwrap_or("{}");
+                let args: serde_json::Value = serde_json::from_str(args_str)
+                    .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+
+                let tickers: Vec<String> = args["tickers"]
+                    .as_array()
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("priceMarketsFromTickers: missing required field 'tickers'")
+                    })?
+                    .iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect();
+
+                return Ok(IntermediateLLMResponse {
+                    output: price_markets_from_tickers(tickers).await?,
                     error: response.error,
                     cost,
                     is_complete: false,

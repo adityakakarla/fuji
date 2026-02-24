@@ -46,10 +46,10 @@ pub async fn get_t20_market_details() -> Result<String> {
     ))
 }
 
-pub async fn get_market_information_by_ticker(ticker: &str) -> Result<Market> {
+pub async fn get_market_information_by_ticker(ticker: &str) -> Result<IndividualMarket> {
     let request = make_get_request(&format!("/markets/{}", ticker)).await?;
     let response = request.json::<Market>().await?;
-    Ok(response)
+    Ok(response.market)
 }
 
 pub fn get_market_details_without_price(market: &IndividualMarket) -> Result<String> {
