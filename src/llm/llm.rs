@@ -91,6 +91,18 @@ enum LLMOutput {
         content: Vec<LLMContent>,
         status: String,
     },
+    WebSearchCall {
+        id: String,
+        status: String,
+    },
+    XSearchCall {
+        id: String,
+        status: String,
+    },
+    CustomToolCall {
+        id: String,
+        status: String,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -124,7 +136,7 @@ pub async fn query_agent(question: &str) -> Result<CleanLLMResponse> {
 pub async fn query_llm_with_built_in_tools(
     previous_response_id: Option<String>,
     prompt: String,
-) -> Result<IntermediateLLMResponse> {
+) -> Result<CleanLLMResponse> {
     let api_key = config::get_grok_api_key()?;
     let client = Client::new();
 
@@ -162,45 +174,20 @@ pub async fn query_llm_with_built_in_tools(
     let response = res.json::<RawLLMResponse>().await?;
     let cost = response.usage.cost_in_usd_ticks / 10_000_000_000.0;
 
-    let output = &response.output[0];
+    let text = response
+        .output
+        .into_iter()
+        .find_map(|o| match o {
+            LLMOutput::Message { content, .. } => Some(content[0].text.clone()),
+            _ => None,
+        })
+        .ok_or_else(|| anyhow::anyhow!("No message found in response output"))?;
 
-    match output {
-        LLMOutput::FunctionCall { name, .. } => match name.as_str() {
-            "web_search_call" => {
-                return Ok(IntermediateLLMResponse {
-                    output: format!("web search completed"),
-                    error: response.error,
-                    cost,
-                    is_complete: false,
-                    id: response.id,
-                });
-            }
-            "x_search_call" => {
-                return Ok(IntermediateLLMResponse {
-                    output: format!("x search completed"),
-                    error: response.error,
-                    cost,
-                    is_complete: false,
-                    id: response.id,
-                });
-            }
-            _ => {
-                return Err(anyhow::Error::msg(format!(
-                    "Unknown function call: {}",
-                    name
-                )));
-            }
-        },
-        LLMOutput::Message { content, .. } => {
-            return Ok(IntermediateLLMResponse {
-                output: content[0].text.clone(),
-                error: response.error,
-                cost,
-                is_complete: true,
-                id: response.id,
-            });
-        }
-    };
+    Ok(CleanLLMResponse {
+        output: text,
+        error: response.error,
+        cost,
+    })
 }
 
 pub async fn query_llm_with_kalshi_tools(
@@ -451,6 +438,13 @@ pub async fn query_llm_with_kalshi_tools(
                 is_complete: true,
                 id: response.id,
             });
+        }
+        LLMOutput::WebSearchCall { .. }
+        | LLMOutput::XSearchCall { .. }
+        | LLMOutput::CustomToolCall { .. } => {
+            return Err(anyhow::Error::msg(
+                "Unexpected built-in tool call in kalshi tools function",
+            ));
         }
     };
 }
