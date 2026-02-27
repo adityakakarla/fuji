@@ -242,7 +242,10 @@ pub async fn query_llm_with_kalshi_tools(
             },
             LLMTool::Function {
                 name: "priceMarketsFromTickers".to_string(),
-                description: "Get LLM-generated fair price estimates for a list of Kalshi market tickers. Returns a yes bid price (as a decimal probability) for each ticker. Note t".to_string(),
+                description: "Get LLM-generated fair price estimates for a list of Kalshi market tickers.
+                            Returns a yes bid price (as a decimal probability) for each ticker. Please only
+                            provide tickers for markets with a volume of at least $500. Otherwise, we hit edge
+                            cases which causes the numbers to look weird.".to_string(),
                 parameters: serde_json::json!({
                     "type": "object",
                     "properties": {

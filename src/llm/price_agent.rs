@@ -23,7 +23,7 @@ async fn price_market(market: IndividualMarket) -> Result<String> {
         None,
         format!(
             "
-    Your task is to determine an exact price for the following market.
+    Your task is to determine an exact price for the following T20 cricket market.
 Based on history, give me an exact valuation for the highest yes bid
 you would take. Return just the number and nothing else. Your output
 should be the yes bid as dollars.
@@ -34,7 +34,7 @@ output.
 Ex, if you think there is a 60% chance of winning, your answer should
 be 0.60 and nothing else.
 
-Return your answer as a decimal number.
+Return your answer as a decimal number. Try to be exact with your guesses.
 
 Market details: {}
 ",

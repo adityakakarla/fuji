@@ -1,3 +1,5 @@
+use std::io;
+
 use crate::kalshi::{api::make_authenticated_post_request, orders::Order};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -34,7 +36,7 @@ pub struct CreateOrderResponse {
     pub order: Order,
 }
 
-pub async fn create_order(request: CreateOrderRequest) -> Result<CreateOrderResponse> {
+async fn create_order(request: CreateOrderRequest) -> Result<CreateOrderResponse> {
     let body = serde_json::to_value(&request)?;
     let response = make_authenticated_post_request("/portfolio/orders", &body).await?;
     let json = response.json::<CreateOrderResponse>().await?;
