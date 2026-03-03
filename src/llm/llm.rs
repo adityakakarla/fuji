@@ -1,5 +1,5 @@
 use crate::kalshi::balance::get_balance;
-use crate::kalshi::markets::get_t20_market_details;
+use crate::kalshi::markets::get_f1_market_details;
 use crate::kalshi::orders::get_open_order_details;
 use crate::kalshi::positions::get_positions_details;
 use crate::kalshi::purchase::place_order;
@@ -223,9 +223,8 @@ pub async fn query_llm_with_kalshi_tools(
                 parameters: serde_json::Value::Object(serde_json::Map::new()),
             },
             LLMTool::Function {
-                name: "getT20Markets".to_string(),
-                description: "Get the current Kalshi T20 markets."
-                    .to_string(),
+                name: "getF1Markets".to_string(),
+                description: "Get the current Kalshi F1 race markets.".to_string(),
                 parameters: serde_json::Value::Object(serde_json::Map::new()),
             },
             LLMTool::Function {
@@ -344,9 +343,9 @@ pub async fn query_llm_with_kalshi_tools(
                         id: response.id,
                     });
                 }
-                "getT20Markets" => {
+                "getF1Markets" => {
                     return Ok(IntermediateLLMResponse {
-                        output: get_t20_market_details().await?,
+                        output: get_f1_market_details().await?,
                         error: response.error,
                         cost,
                         is_complete: false,

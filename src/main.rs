@@ -48,7 +48,7 @@ async fn main() -> Result<(), anyhow::Error> {
         }
         Commands::Run { prompt } => {
             let response = llm::llm::query_agent(&prompt.unwrap_or(String::from(
-                "Find the best markets for me to bet on. Target markets where the prices are +/- 6 cents above where the price currently lies.
+                "Find the best F1 markets for me to bet on. Target markets where the prices are +/- 6 cents above where the price currently lies.
 
             Use the pricing function to determine the best price for a market. Remember
             that you can either buy/sell Yes or No for a market.",

@@ -46,10 +46,10 @@ async fn get_markets_by_series_ticker(series_ticker: &str) -> Result<Vec<Individ
     Ok(result)
 }
 
-pub async fn get_t20_market_details() -> Result<String> {
+pub async fn get_f1_market_details() -> Result<String> {
     Ok(format!(
         "{:?}",
-        get_markets_by_series_ticker("KXT20MATCH").await?
+        get_markets_by_series_ticker("KXF1RACE").await?
     ))
 }
 
