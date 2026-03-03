@@ -1,4 +1,4 @@
-# kalshi-f1
+# fuji
 
 A CLI trading bot (built in Rust) that uses xAI (Grok) + the Kalshi API to automatically identify and place bets on F1 race markets.
 
