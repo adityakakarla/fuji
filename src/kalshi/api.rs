@@ -1,5 +1,6 @@
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
+use chrono::Utc;
 use reqwest::{
     Response,
     header::{HeaderMap, HeaderValue},
@@ -14,15 +15,13 @@ use serde_json::Value;
 use sha2::Sha256;
 
 use crate::config::{get_kalshi_api_key, get_kalshi_key_id};
-use chrono::Utc;
+
+const KALSHI_BASE_URL: &str = "https://api.elections.kalshi.com/trade-api/v2";
 
 pub async fn make_get_request(path: &str) -> Result<Response> {
     let client = reqwest::Client::new();
     let res = client
-        .get(format!(
-            "https://api.elections.kalshi.com/trade-api/v2{}",
-            path
-        ))
+        .get(format!("{}{}", KALSHI_BASE_URL, path))
         .send()
         .await?;
 
@@ -34,33 +33,12 @@ pub async fn make_get_request(path: &str) -> Result<Response> {
 }
 
 pub async fn make_authenticated_get_request(path: &str) -> Result<Response> {
-    let kalshi_key_id = get_kalshi_key_id()?;
-    let kalshi_private_key = get_kalshi_api_key()?;
-    let current_timestamp = Utc::now().timestamp_millis();
-    let signature = sign_authenticated_request(
-        &kalshi_private_key,
-        &current_timestamp.to_string(),
-        "GET",
-        path,
-    )?;
-
-    let mut headers = HeaderMap::new();
-    headers.insert("KALSHI-ACCESS-KEY", HeaderValue::from_str(&kalshi_key_id)?);
-    headers.insert(
-        "KALSHI-ACCESS-SIGNATURE",
-        HeaderValue::from_str(&signature)?,
-    );
-    headers.insert(
-        "KALSHI-ACCESS-TIMESTAMP",
-        HeaderValue::from_str(&current_timestamp.to_string())?,
-    );
+    let timestamp = Utc::now().timestamp_millis();
+    let headers = build_auth_headers(path, "GET", timestamp)?;
 
     let client = reqwest::Client::new();
     let res = client
-        .get(format!(
-            "https://api.elections.kalshi.com/trade-api/v2{}",
-            path
-        ))
+        .get(format!("{}{}", KALSHI_BASE_URL, path))
         .headers(headers)
         .send()
         .await?;
@@ -72,33 +50,12 @@ pub async fn make_authenticated_get_request(path: &str) -> Result<Response> {
 }
 
 pub async fn make_authenticated_post_request(path: &str, body: &Value) -> Result<Response> {
-    let kalshi_key_id = get_kalshi_key_id()?;
-    let kalshi_private_key = get_kalshi_api_key()?;
-    let current_timestamp = Utc::now().timestamp_millis();
-    let signature = sign_authenticated_request(
-        &kalshi_private_key,
-        &current_timestamp.to_string(),
-        "POST",
-        path,
-    )?;
-
-    let mut headers = HeaderMap::new();
-    headers.insert("KALSHI-ACCESS-KEY", HeaderValue::from_str(&kalshi_key_id)?);
-    headers.insert(
-        "KALSHI-ACCESS-SIGNATURE",
-        HeaderValue::from_str(&signature)?,
-    );
-    headers.insert(
-        "KALSHI-ACCESS-TIMESTAMP",
-        HeaderValue::from_str(&current_timestamp.to_string())?,
-    );
+    let timestamp = Utc::now().timestamp_millis();
+    let headers = build_auth_headers(path, "POST", timestamp)?;
 
     let client = reqwest::Client::new();
     let res = client
-        .post(format!(
-            "https://api.elections.kalshi.com/trade-api/v2{}",
-            path
-        ))
+        .post(format!("{}{}", KALSHI_BASE_URL, path))
         .headers(headers)
         .json(body)
         .send()
@@ -108,6 +65,26 @@ pub async fn make_authenticated_post_request(path: &str, body: &Value) -> Result
         return Err(err.into());
     }
     Ok(res)
+}
+
+fn build_auth_headers(path: &str, method: &str, timestamp: i64) -> Result<HeaderMap> {
+    let kalshi_key_id = get_kalshi_key_id()?;
+    let kalshi_private_key = get_kalshi_api_key()?;
+    let signature = sign_authenticated_request(
+        &kalshi_private_key,
+        &timestamp.to_string(),
+        method,
+        path,
+    )?;
+
+    let mut headers = HeaderMap::new();
+    headers.insert("KALSHI-ACCESS-KEY", HeaderValue::from_str(&kalshi_key_id)?);
+    headers.insert("KALSHI-ACCESS-SIGNATURE", HeaderValue::from_str(&signature)?);
+    headers.insert(
+        "KALSHI-ACCESS-TIMESTAMP",
+        HeaderValue::from_str(&timestamp.to_string())?,
+    );
+    Ok(headers)
 }
 
 fn sign_authenticated_request(

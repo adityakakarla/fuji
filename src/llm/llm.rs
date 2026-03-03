@@ -133,18 +133,23 @@ pub async fn query_agent(question: &str) -> Result<CleanLLMResponse> {
     })
 }
 
+fn build_grok_headers(api_key: &str) -> Result<HeaderMap> {
+    let mut headers = HeaderMap::new();
+    headers.insert("Content-Type", HeaderValue::from_str("application/json")?);
+    headers.insert(
+        "Authorization",
+        HeaderValue::from_str(&format!("Bearer {}", api_key))?,
+    );
+    Ok(headers)
+}
+
 pub async fn query_llm_with_built_in_tools(
     previous_response_id: Option<String>,
     prompt: String,
 ) -> Result<CleanLLMResponse> {
     let api_key = config::get_grok_api_key()?;
     let client = Client::new();
-
-    let mut header_map = HeaderMap::new();
-    let content_type = HeaderValue::from_str("application/json")?;
-    header_map.insert("Content-Type", content_type);
-    let authorization = HeaderValue::from_str(format!("Bearer {}", api_key).as_str())?;
-    header_map.insert("Authorization", authorization);
+    let header_map = build_grok_headers(&api_key)?;
 
     let body = serde_json::to_string(&LLMInput {
         model: PRICING_GROK_MODEL.to_string(),
@@ -196,12 +201,7 @@ pub async fn query_llm_with_kalshi_tools(
 ) -> Result<IntermediateLLMResponse> {
     let api_key = config::get_grok_api_key()?;
     let client = Client::new();
-
-    let mut header_map = HeaderMap::new();
-    let content_type = HeaderValue::from_str("application/json")?;
-    header_map.insert("Content-Type", content_type);
-    let authorization = HeaderValue::from_str(format!("Bearer {}", api_key).as_str())?;
-    header_map.insert("Authorization", authorization);
+    let header_map = build_grok_headers(&api_key)?;
 
     let body = serde_json::to_string(&LLMInput {
         model: KALSHI_GROK_MODEL.to_string(),
@@ -302,7 +302,7 @@ pub async fn query_llm_with_kalshi_tools(
                 }),
             },
         ]),
-        previous_response_id: previous_response_id,
+        previous_response_id,
     })?;
 
     let res = client

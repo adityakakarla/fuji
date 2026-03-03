@@ -7,7 +7,7 @@ use figment::{
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
 struct AppConfig {
     grok_api_key: String,
     kalshi_api_key_path: String,
@@ -40,11 +40,7 @@ pub fn get_kalshi_api_key() -> Result<String> {
 }
 
 pub fn set_kalshi_api_key_path(api_key_path: &String) -> Result<()> {
-    let mut config = load_config().unwrap_or(AppConfig {
-        grok_api_key: String::new(),
-        kalshi_api_key_path: String::new(),
-        kalshi_key_id: String::new(),
-    });
+    let mut config = load_config().unwrap_or(AppConfig::default());
     config.kalshi_api_key_path = api_key_path.clone();
     let path = get_config_path()?;
     fs::write(path, toml::to_string(&config)?).map_err(anyhow::Error::from)
@@ -56,11 +52,7 @@ pub fn get_kalshi_key_id() -> Result<String> {
 }
 
 pub fn set_kalshi_key_id(key_id: &String) -> Result<()> {
-    let mut config = load_config().unwrap_or(AppConfig {
-        grok_api_key: String::new(),
-        kalshi_api_key_path: String::new(),
-        kalshi_key_id: String::new(),
-    });
+    let mut config = load_config().unwrap_or(AppConfig::default());
     config.kalshi_key_id = key_id.clone();
     let path = get_config_path()?;
     fs::write(path, toml::to_string(&config)?).map_err(anyhow::Error::from)
@@ -72,22 +64,14 @@ pub fn get_grok_api_key() -> Result<String> {
 }
 
 pub fn set_grok_api_key(api_key: &String) -> Result<()> {
-    let mut config = load_config().unwrap_or(AppConfig {
-        grok_api_key: String::new(),
-        kalshi_api_key_path: String::new(),
-        kalshi_key_id: String::new(),
-    });
+    let mut config = load_config().unwrap_or(AppConfig::default());
     config.grok_api_key = api_key.clone();
     let path = get_config_path()?;
     fs::write(path, toml::to_string(&config)?).map_err(anyhow::Error::from)
 }
 
 pub fn view_config() -> Result<()> {
-    let config = load_config().unwrap_or(AppConfig {
-        grok_api_key: String::new(),
-        kalshi_api_key_path: String::new(),
-        kalshi_key_id: String::new(),
-    });
+    let config = load_config().unwrap_or(AppConfig::default());
     println!("Config: {:?}", config);
     Ok(())
 }
