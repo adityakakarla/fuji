@@ -1,3 +1,4 @@
+use crate::f1::race_control::{RaceControlParams, get_race_control_details};
 use crate::kalshi::balance::get_balance;
 use crate::kalshi::markets::get_f1_market_details;
 use crate::kalshi::orders::get_open_order_details;
@@ -260,6 +261,48 @@ pub async fn query_llm_with_kalshi_tools(
                 }),
             },
             LLMTool::Function {
+                name: "getRaceControl".to_string(),
+                description: "Fetch race control events from the OpenF1 API (flags, safety cars, messages, etc.). All parameters are optional filters. Setting session key equal to the string 'latest' will get you the current/latest session".to_string(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "session_key": {
+                            "type": "string",
+                            "description": "Filter by OpenF1 session key, or 'latest' for the current session"
+                        },
+                        "meeting_key": {
+                            "type": "integer",
+                            "description": "Filter by OpenF1 meeting key"
+                        },
+                        "driver_number": {
+                            "type": "integer",
+                            "description": "Filter events for a specific driver number"
+                        },
+                        "flag": {
+                            "type": "string",
+                            "description": "Filter by flag type, e.g. 'BLACK AND WHITE', 'YELLOW', 'RED', 'SAFETY CAR'"
+                        },
+                        "category": {
+                            "type": "string",
+                            "description": "Filter by event category, e.g. 'Flag', 'SafetyCar', 'Other'"
+                        },
+                        "lap_number": {
+                            "type": "integer",
+                            "description": "Filter by lap number"
+                        },
+                        "date_from": {
+                            "type": "string",
+                            "description": "Start of date range (ISO 8601, e.g. '2023-01-01')"
+                        },
+                        "date_to": {
+                            "type": "string",
+                            "description": "End of date range (ISO 8601, exclusive, e.g. '2023-09-01')"
+                        }
+                    },
+                    "required": []
+                }),
+            },
+            LLMTool::Function {
                 name: "createOrder".to_string(),
                 description: "Place an order on Kalshi. Use yes_price for buying/selling Yes contracts, or no_price for buying/selling No contracts. Prices are in cents (1-99). Only provide the price field relevant to your side.".to_string(),
                 parameters: serde_json::json!({
@@ -323,7 +366,7 @@ pub async fn query_llm_with_kalshi_tools(
 
     match output {
         LLMOutput::FunctionCall { name, arguments } => {
-            println!("{}", name);
+            println!("{}, arguments: {}", name, arguments.clone().unwrap());
             match name.as_str() {
                 "getBalance" => {
                     return Ok(IntermediateLLMResponse {
@@ -364,6 +407,30 @@ pub async fn query_llm_with_kalshi_tools(
                 "getPositions" => {
                     return Ok(IntermediateLLMResponse {
                         output: get_positions_details().await?,
+                        error: response.error,
+                        cost,
+                        is_complete: false,
+                        id: response.id,
+                    });
+                }
+                "getRaceControl" => {
+                    let args_str = arguments.as_deref().unwrap_or("{}");
+                    let args: serde_json::Value = serde_json::from_str(args_str)
+                        .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+
+                    let params = RaceControlParams {
+                        session_key: args["session_key"].as_str().map(String::from),
+                        meeting_key: args["meeting_key"].as_i64().map(|v| v as i32),
+                        driver_number: args["driver_number"].as_i64().map(|v| v as i32),
+                        flag: args["flag"].as_str().map(String::from),
+                        category: args["category"].as_str().map(String::from),
+                        lap_number: args["lap_number"].as_i64().map(|v| v as i32),
+                        date_from: args["date_from"].as_str().map(String::from),
+                        date_to: args["date_to"].as_str().map(String::from),
+                    };
+
+                    return Ok(IntermediateLLMResponse {
+                        output: get_race_control_details(params).await?,
                         error: response.error,
                         cost,
                         is_complete: false,

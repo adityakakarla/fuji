@@ -5,22 +5,22 @@ const OPENF1_BASE_URL: &str = "https://api.openf1.org/v1";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RaceControlEvent {
-    pub category: String,
+    pub category: Option<String>,
     pub date: String,
     pub driver_number: Option<i32>,
     pub flag: Option<String>,
     pub lap_number: Option<i32>,
     pub meeting_key: i32,
-    pub message: String,
+    pub message: Option<String>,
     pub qualifying_phase: Option<String>,
-    pub scope: String,
+    pub scope: Option<String>,
     pub sector: Option<i32>,
     pub session_key: i32,
 }
 
 #[derive(Debug, Default)]
 pub struct RaceControlParams {
-    pub session_key: Option<i32>,
+    pub session_key: Option<String>,
     pub meeting_key: Option<i32>,
     pub driver_number: Option<i32>,
     pub flag: Option<String>,
@@ -86,7 +86,7 @@ pub async fn get_race_control_details(params: RaceControlParams) -> Result<Strin
                 "[{}] Lap {}: {} (session={}, driver={:?})",
                 e.date,
                 e.lap_number.map_or("?".to_string(), |l| l.to_string()),
-                e.message,
+                e.message.as_deref().unwrap_or(""),
                 e.session_key,
                 e.driver_number,
             )
